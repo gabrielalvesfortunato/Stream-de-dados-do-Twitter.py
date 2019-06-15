@@ -1,0 +1,113 @@
+from tweepy.streaming import StreamListener
+from tweepy import OAuthHandler
+from tweepy import Stream
+from datetime import datetime
+import json
+
+
+#Adicionar a consumer Key
+consumer_key = "GzpiOpLm6hZSNMIgBMz5CFHol"
+
+#Acidionar a consumer secret
+consulmer_secret = "rcJf6IQqmxOdCv23m4HQgvhzdvgBHaIvk2AvAkHUEBipiwzhxV"
+
+#Acess token e Acess token secret
+acess_token = "785480023042039808-eNgXD7P4qYYDQLtWZFWNkBHlk98fC7e"
+acess_token_secret = "Evot4v2Kz1GAaNTDWKRsSH0ZlcRMCgj5o0GHfZs6SdDUl"
+
+
+#Criando as chaves de autenticaçao
+auth = OAuthHandler(consumer_key, consulmer_secret)
+auth.set_access_token(acess_token, acess_token_secret)
+
+class MyListener(StreamListener):
+    def on_data(self, dados):
+        tweet = json.loads(dados)
+        created_at = tweet["created_at"]
+        id_str = tweet["id_str"]
+        text = tweet["text"]
+        obj = {
+            "created_at": created_at, 
+            "id_str": id_str, 
+            "text": text,
+        }
+        tweetind = collection.insert_one(obj).inserted_id
+        print(obj)
+        return True
+
+#Criando o objeto myListener
+myListener = MyListener()
+
+#Criando o objeto mystream
+myStream = Stream(auth, listener = myListener)
+
+
+
+                ###################
+                #   Preparando    #
+                #    Conexao      # 
+                #      com        # 
+                #  Banco de Dados #
+                ###################
+
+
+
+from pymongo import MongoClient
+
+#Criando conexao no MongoDB
+client = MongoClient("localhost", 27017)
+
+#Criando o banco de dados
+dataBase = client.twitterdb
+
+#Criando a collection "collection"
+collection = dataBase.tweets
+
+#Lista de palavras chave
+key_words = ["Big Data", "Python", "Data Science", "Data Mining"]
+
+
+                ###################
+                #   Colentado     #
+                #   os Tweets     #
+                ###################
+
+
+#Inicia o filtro e grava os tweets no MongoDB
+myStream.filter(track = key_words)
+
+myStream.disconnect()
+
+collection.find_one()
+
+
+                ####################
+                #  Analizando os   #
+                # dados com pandas #
+                # e scikit-learn   #
+                ####################
+
+import pandas as pd
+
+#Cria um dataset com dados retornados do MongoDB
+dataset = [{"created_at": item["created_at"], "text":item["text"],} for item in collection.find()]
+
+# Cria um data frame a partir do dataset
+df = pd.DataFrame(dataset)
+
+print(df)
+
+
+#Importando o modulo Scikit-Learn
+from sklearn.feature_extraction.text import CountVectorizer
+
+#Usando o metodo CountVectorizer para criar uma matriz de documentos
+cv = CountVectorizer()
+count_matrix = cv.fit_transform(df.text)
+
+# Contando o numero de ocorrencias das principais palavras em nosso dataset
+word_count = pd.DataFrame(cv.get_feature_names(), columns=["word"])
+word_count["count"] = count_matrix.sum(axis=0).tolist()[0]
+word_count = word_count.sort_values("count", ascending=False).reset_index(drop=True)
+word_count[:50]
+
